@@ -1,0 +1,113 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum userStatus {
+  ACTIVE
+  INACTIVE
+  PENDING
+  BLOCKED
+  DELETED
+}
+
+enum userRole {
+  ADMIN
+  USER
+  MODERATOR
+  SUPER_ADMIN
+}
+
+enum userType {
+  INDIVIDUAL
+  ORGANIZATION
+}
+
+enum LedgerSide {
+  DEBIT
+  CREDIT
+}
+
+enum DepositStatus {
+  PENDING
+  COMPLETED
+  FAILED
+}
+
+model User {
+  id        String     @id @default(uuid())
+  email     String     @unique
+  password  String
+  status    userStatus
+  role      userRole   @default(USER)
+  type      userType   @default(INDIVIDUAL)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  ledgerAccounts LedgerAccount[]
+  deposits       Deposit[]
+}
+
+model LedgerAccount {
+  id        String   @id @default(uuid())
+  userId    String?
+  asset     String
+  createdAt DateTime @default(now())
+
+  user    User?         @relation(fields: [userId], references: [id])
+  entries LedgerEntry[]
+}
+
+model LedgerEntry {
+  id           BigInt     @id @default(autoincrement())
+  txGroup      String
+  accountId    String
+  side         LedgerSide
+  amount       Decimal    @db.Decimal(20, 0)
+  asset        String
+  previousHash String
+  hash         String
+  createdAt    DateTime   @default(now())
+
+  account LedgerAccount @relation(fields: [accountId], references: [id])
+
+  @@index([txGroup])
+  @@index([accountId])
+}
+
+model Balance {
+  accountId String
+  asset     String
+  balance   Decimal  @db.Decimal(20, 0)
+  updatedAt DateTime @updatedAt
+
+  @@id([accountId, asset])
+}
+
+model Deposit {
+  id          String        @id @default(uuid())
+  userId      String
+  amount      Decimal       @db.Decimal(20, 0)
+  asset       String
+  txSignature String        @unique
+  status      DepositStatus @default(PENDING)
+  createdAt   DateTime      @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model IdempotencyKey {
+  key       String   @id
+  scope     String
+  createdAt DateTime @default(now())
+}
