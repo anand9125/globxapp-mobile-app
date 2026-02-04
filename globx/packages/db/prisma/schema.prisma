@@ -13,101 +13,345 @@ datasource db {
   provider = "postgresql"
 }
 
-enum userStatus {
-  ACTIVE
-  INACTIVE
-  PENDING
-  BLOCKED
-  DELETED
-}
-
-enum userRole {
-  ADMIN
-  USER
-  MODERATOR
-  SUPER_ADMIN
-}
-
-enum userType {
-  INDIVIDUAL
-  ORGANIZATION
-}
-
-enum LedgerSide {
-  DEBIT
-  CREDIT
-}
-
-enum DepositStatus {
-  PENDING
-  COMPLETED
-  FAILED
-}
+// USERS & AUTHENTICATION
 
 model User {
-  id        String     @id @default(uuid())
-  email     String     @unique
-  password  String
-  status    userStatus
-  role      userRole   @default(USER)
-  type      userType   @default(INDIVIDUAL)
-  createdAt DateTime   @default(now())
-  updatedAt DateTime   @updatedAt
+  id             String    @id @default(uuid())
+  email          String    @unique
+  emailVerified  DateTime?
+  name           String?
+  authProvider   String 
+  authProviderId String? // Provider-specific ID (for OAuth)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  isActive       Boolean   @default(true)
+  kycStatus      String?
 
-  ledgerAccounts LedgerAccount[]
-  deposits       Deposit[]
+  // Relations
+  deposits      Deposit[]
+  trades        Trade[]
+  withdrawals   Withdrawal[]
+  balances      Balance[]
+  ledgerEntries LedgerEntry[]
+
+  @@index([email])
+  @@index([authProvider, authProviderId])
+  @@map("users")
 }
 
-model LedgerAccount {
-  id        String   @id @default(uuid())
-  userId    String?
-  asset     String
-  createdAt DateTime @default(now())
-
-  user    User?         @relation(fields: [userId], references: [id])
-  entries LedgerEntry[]
-}
+// DOUBLE-ENTRY LEDGER (IMMUTABLE, APPEND-ONLY)
 
 model LedgerEntry {
-  id           BigInt     @id @default(autoincrement())
-  txGroup      String
-  accountId    String
-  side         LedgerSide
-  amount       Decimal    @db.Decimal(20, 0)
-  asset        String
-  previousHash String
-  hash         String
-  createdAt    DateTime   @default(now())
+  id            BigInt  @id @default(autoincrement())
+  entryType     String // "DEPOSIT", "TRADE", "WITHDRAWAL", "FEE", "ADJUSTMENT"
+  transactionId String // Links related entries (e.g., both sides of a trade)
+  userId        String? // Null for system accounts
+  accountType   String // "ASSET_CASH", "ASSET_STOCK", "EQUITY_USER", "EQUITY_SYSTEM", "REVENUE_FEES"
+  tokenMint     String? // SPL token mint address (null for SOL/system accounts)
+  amount        Decimal @db.Decimal(78, 0) // Using Decimal.js compatible precision
+  side          String // "DEBIT" or "CREDIT"
+  description   String?
 
-  account LedgerAccount @relation(fields: [accountId], references: [id])
+  // Hash chain for tamper detection
+  previousHash String? // Hash of previous entry (null for first entry)
+  entryHash    String // Hash(current_entry_data + previous_hash)
 
-  @@index([txGroup])
-  @@index([accountId])
+  // Metadata
+  metadata  Json? // Additional context (trade details, etc.)
+  createdAt DateTime @default(now())
+  createdBy String? // System identifier (e.g., "api", "indexer", "reconciliation")
+
+  // Relations
+  user User? @relation(fields: [userId], references: [id])
+
+  // CRITICAL: No UPDATE/DELETE operations allowed on this table
+  // Enforced via DB permissions (not Prisma-level)
+  @@index([userId])
+  @@index([transactionId])
+  @@index([entryType])
+  @@index([tokenMint])
+  @@index([createdAt])
+  @@index([entryHash])
+  @@index([previousHash])
+  @@map("ledger")
 }
+
+// Hash chain verification table (for quick integrity checks)
+model LedgerHashChain {
+  id            BigInt   @id @default(autoincrement())
+  entryId       BigInt   @unique
+  previousHash  String?
+  entryHash     String   @unique
+  chainPosition BigInt // Sequential position in chain
+  createdAt     DateTime @default(now())
+
+  @@index([chainPosition])
+  @@index([entryHash])
+  @@map("ledger_hash_chain")
+}
+
+
+// BALANCE SNAPSHOTS (DERIVED, FOR PERFORMANCE)
 
 model Balance {
-  accountId String
-  asset     String
-  balance   Decimal  @db.Decimal(20, 0)
-  updatedAt DateTime @updatedAt
-
-  @@id([accountId, asset])
-}
-
-model Deposit {
-  id          String        @id @default(uuid())
-  userId      String
-  amount      Decimal       @db.Decimal(20, 0)
-  asset       String
-  txSignature String        @unique
-  status      DepositStatus @default(PENDING)
-  createdAt   DateTime      @default(now())
+  id        BigInt   @id @default(autoincrement())
+  userId    String
+  tokenMint String // SPL token mint address, or "SOL" for native SOL
+  amount    Decimal  @db.Decimal(78, 0) // Always positive (absolute balance)
+  updatedAt DateTime @default(now()) @updatedAt
 
   user User @relation(fields: [userId], references: [id])
+
+  @@unique([userId, tokenMint])
+  @@index([userId])
+  @@index([tokenMint])
+  @@map("balances")
 }
 
+// DEPOSITS
+
+model Deposit {
+  id        String  @id @default(uuid())
+  userId    String
+  tokenMint String // SPL token mint address
+  amount    Decimal @db.Decimal(78, 0)
+  status    String // "PENDING", "PROCESSING", "CONFIRMED", "FAILED", "CANCELLED"
+
+  // On-chain tracking
+  depositId      String  @unique // 32-byte deposit ID (from on-chain event)
+  onChainTxSig   String? // Solana transaction signature
+  onChainSlot    BigInt? // Solana slot number
+  onChainEventId BigInt? // Reference to OnChainEvent
+
+  // Flow tracking
+  depositVaultReceived Boolean @default(false) // userToDeposit completed
+  mainVaultReceived    Boolean @default(false) // depositToMain completed
+
+  // Metadata
+  sourceAddress String? // User's source wallet address
+  metadata      Json?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  confirmedAt   DateTime?
+
+  user         User          @relation(fields: [userId], references: [id])
+  onChainEvent OnChainEvent? @relation(fields: [onChainEventId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([depositId])
+  @@index([onChainTxSig])
+  @@index([createdAt])
+  @@map("deposits")
+}
+
+// TRADES
+
+model Trade {
+  id        String @id @default(uuid())
+  userId    String
+  direction String // "BUY" or "SELL"
+
+  // Input token (what user is giving)
+  inputTokenMint String // Usually USDC for buys, stock token for sells
+  inputAmount    Decimal @db.Decimal(78, 0)
+
+  // Output token (what user is receiving)
+  outputTokenMint String // Stock token for buys, USDC for sells
+  outputAmount    Decimal @db.Decimal(78, 0)
+
+  // Pricing
+  priceUsd    Decimal? @db.Decimal(20, 8) // Price per share in USD
+  slippageBps Int? // Slippage tolerance in basis points
+
+  // Fees
+  feeAmount    Decimal @db.Decimal(78, 0)
+  feeTokenMint String // Token in which fee was paid
+
+  status String // "PENDING", "SUBMITTED", "EXECUTED", "FAILED", "CANCELLED"
+
+  // On-chain tracking
+  swapTxSig      String? // Solana transaction signature
+  swapSlot       BigInt? // Solana slot number
+  swapRouteType  String? // "JUPITER", "KAMINO", etc.
+  onChainEventId BigInt? // Reference to OnChainEvent
+
+  // Metadata
+  metadata   Json?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  executedAt DateTime?
+
+  user         User          @relation(fields: [userId], references: [id])
+  onChainEvent OnChainEvent? @relation(fields: [onChainEventId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([swapTxSig])
+  @@index([inputTokenMint])
+  @@index([outputTokenMint])
+  @@index([createdAt])
+  @@map("trades")
+}
+
+// WITHDRAWALS
+
+model Withdrawal {
+  id        String  @id @default(uuid())
+  userId    String
+  tokenMint String // SPL token mint address
+  amount    Decimal @db.Decimal(78, 0)
+  status    String // "PENDING", "APPROVED", "PROCESSING", "COMPLETED", "FAILED", "CANCELLED"
+
+  // Destination
+  destinationAddress String // User's destination wallet address
+
+  // On-chain tracking
+  withdrawalId   String? @unique // 32-byte withdrawal ID (from on-chain event)
+  onChainTxSig   String? // Solana transaction signature
+  onChainSlot    BigInt? // Solana slot number
+  onChainEventId BigInt? // Reference to OnChainEvent
+
+  // Flow tracking
+  withdrawalVaultSent Boolean @default(false) // withdrawalToUser completed
+
+  // Approval workflow (for compliance/2FA)
+  approvedBy String? // Admin user ID who approved
+  approvedAt DateTime?
+
+  // Metadata
+  metadata    Json?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  user         User          @relation(fields: [userId], references: [id])
+  onChainEvent OnChainEvent? @relation(fields: [onChainEventId], references: [id])
+
+  @@index([userId])
+  @@index([status])
+  @@index([withdrawalId])
+  @@index([onChainTxSig])
+  @@index([createdAt])
+  @@map("withdrawals")
+}
+
+// IDEMPOTENCY
+
 model IdempotencyKey {
-  key       String   @id
-  scope     String
-  createdAt DateTime @default(now())
+  id           String   @id @default(uuid())
+  key          String   @unique // Client-provided idempotency key
+  endpoint     String // API endpoint (e.g., "/v1/trades/execute")
+  requestHash  String // Hash of request body (to detect duplicate requests with different bodies)
+  responseCode Int // HTTP response code
+  responseBody Json // Cached response body
+  userId       String? // User who made the request
+  createdAt    DateTime @default(now())
+  expiresAt    DateTime // TTL for cleanup (typically 24 hours)
+
+  @@index([key])
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("idempotency_keys")
+}
+
+// OUTBOX PATTERN (for event publishing)
+
+model Outbox {
+  id            BigInt    @id @default(autoincrement())
+  eventType     String // "DEPOSIT_CONFIRMED", "TRADE_EXECUTED", "WITHDRAWAL_COMPLETED", etc.
+  aggregateType String // "DEPOSIT", "TRADE", "WITHDRAWAL"
+  aggregateId   String // ID of the aggregate (deposit ID, trade ID, etc.)
+  payload       Json // Event payload
+  status        String    @default("PENDING") // "PENDING", "PUBLISHED", "FAILED"
+  retryCount    Int       @default(0)
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+
+  @@index([status])
+  @@index([eventType])
+  @@index([aggregateId])
+  @@index([createdAt])
+  @@map("outbox")
+}
+
+// ON-CHAIN EVENTS (INDEXED FROM SOLANA)
+
+model OnChainEvent {
+  id                 BigInt @id @default(autoincrement())
+  eventType          String // "depositReceived", "swapExecuted", "swapFailed", "vaultToUserWithdrawal", etc.
+  eventDiscriminator String // Anchor event discriminator (8 bytes hex)
+
+  // Solana metadata
+  txSignature String  @unique
+  slot        BigInt
+  blockTime   BigInt? // Unix timestamp from block
+  programId   String // Program ID that emitted the event
+
+  // Finality tracking
+  status        String    @default("TENTATIVE") // "TENTATIVE", "FINALIZED", "REORGED"
+  confirmations Int       @default(0) // Number of confirmations
+  finalizedAt   DateTime?
+
+  // Event data (parsed from Anchor event)
+  eventData Json // Structured event data
+
+  // Relations
+  deposits    Deposit[]
+  trades      Trade[]
+  withdrawals Withdrawal[]
+
+  @@index([eventType])
+  @@index([txSignature])
+  @@index([slot])
+  @@index([status])
+  @@index([programId])
+  @@map("onchain_events")
+}
+
+// RECONCILIATION
+
+model ReconciliationRun {
+  id          BigInt    @id @default(autoincrement())
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  status      String    @default("RUNNING") // "RUNNING", "COMPLETED", "FAILED", "FROZEN"
+
+  // Results
+  totalTokensChecked Int   @default(0)
+  mismatchesFound    Int   @default(0)
+  mismatches         Json? // Array of mismatch details
+
+  // System state
+  systemFrozen Boolean @default(false) // Whether system was frozen due to mismatch
+
+  // Metadata
+  errorMessage String?
+  metadata     Json?
+
+  @@index([startedAt])
+  @@index([status])
+  @@map("reconciliation_runs")
+}
+
+// SYSTEM CONFIGURATION
+
+model SystemConfig {
+  id           String    @id @default("singleton") // Singleton pattern
+  isFrozen     Boolean   @default(false) // Emergency freeze flag
+  frozenReason String?
+  frozenAt     DateTime?
+  frozenBy     String? // Admin user ID
+
+  // Indexer state
+  lastProcessedSlot BigInt? // Last Solana slot processed by indexer
+  indexerLagSeconds Int? // Current lag in seconds
+
+  // Reconciliation settings
+  reconciliationIntervalMinutes Int     @default(5)
+  lastReconciliationRunId       BigInt?
+
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@map("system_config")
 }
