@@ -11,23 +11,21 @@ datasource db {
   provider = "postgresql"
 }
 
+// USERS & AUTHENTICATION
+
 model User {
   id             String    @id @default(uuid())
   email          String    @unique
   emailVerified  DateTime?
   name           String?
-  image          String? // Auth.js profile image
-  authProvider   String    @default("email") // "email", "oauth_google", "oauth_github", "passkey"
-  authProviderId String? // Provider-specific ID (for OAuth) / password hash for credentials
+  authProvider   String 
+  authProviderId String? // Provider-specific ID (for OAuth)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   isActive       Boolean   @default(true)
+  kycStatus      String?
 
-  // Auth.js relations
-  accounts Account[]
-  sessions Session[]
-
-  // App relations
+  // Relations
   deposits      Deposit[]
   trades        Trade[]
   withdrawals   Withdrawal[]
@@ -39,48 +37,7 @@ model User {
   @@map("users")
 }
 
-// Auth.js (NextAuth) – OAuth/linked accounts
-model Account {
-  id                String  @id @default(uuid())
-  userId            String
-  type              String
-  provider          String
-  providerAccountId String
-  refresh_token     String? @db.Text
-  access_token      String? @db.Text
-  expires_at        Int?
-  token_type        String?
-  scope             String?
-  id_token          String? @db.Text
-  session_state     String?
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@unique([provider, providerAccountId])
-  @@map("accounts")
-}
-
-// Auth.js (NextAuth) – sessions
-model Session {
-  id           String   @id @default(uuid())
-  sessionToken String   @unique
-  userId       String
-  expires      DateTime
-
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@map("sessions")
-}
-
-// Auth.js (NextAuth) – email verification / magic links
-model VerificationToken {
-  identifier String
-  token      String
-  expires    DateTime
-
-  @@unique([identifier, token])
-  @@map("verification_tokens")
-}
+// DOUBLE-ENTRY LEDGER (IMMUTABLE, APPEND-ONLY)
 
 model LedgerEntry {
   id            BigInt  @id @default(autoincrement())
@@ -131,6 +88,9 @@ model LedgerHashChain {
   @@map("ledger_hash_chain")
 }
 
+
+// BALANCE SNAPSHOTS (DERIVED, FOR PERFORMANCE)
+
 model Balance {
   id        BigInt   @id @default(autoincrement())
   userId    String
@@ -145,6 +105,8 @@ model Balance {
   @@index([tokenMint])
   @@map("balances")
 }
+
+// DEPOSITS
 
 model Deposit {
   id        String  @id @default(uuid())
@@ -180,6 +142,8 @@ model Deposit {
   @@index([createdAt])
   @@map("deposits")
 }
+
+// TRADES
 
 model Trade {
   id        String @id @default(uuid())
@@ -228,6 +192,8 @@ model Trade {
   @@map("trades")
 }
 
+// WITHDRAWALS
+
 model Withdrawal {
   id        String  @id @default(uuid())
   userId    String
@@ -268,7 +234,7 @@ model Withdrawal {
   @@map("withdrawals")
 }
 
-// =================================================================
+// IDEMPOTENCY
 
 model IdempotencyKey {
   id           String   @id @default(uuid())
@@ -287,9 +253,7 @@ model IdempotencyKey {
   @@map("idempotency_keys")
 }
 
-// ============================================================================
 // OUTBOX PATTERN (for event publishing)
-// ============================================================================
 
 model Outbox {
   id            BigInt    @id @default(autoincrement())
@@ -309,9 +273,7 @@ model Outbox {
   @@map("outbox")
 }
 
-// ============================================================================
 // ON-CHAIN EVENTS (INDEXED FROM SOLANA)
-// ============================================================================
 
 model OnChainEvent {
   id                 BigInt @id @default(autoincrement())
@@ -345,9 +307,7 @@ model OnChainEvent {
   @@map("onchain_events")
 }
 
-// ============================================================================
 // RECONCILIATION
-// ============================================================================
 
 model ReconciliationRun {
   id          BigInt    @id @default(autoincrement())
@@ -372,9 +332,7 @@ model ReconciliationRun {
   @@map("reconciliation_runs")
 }
 
-// ============================================================================
 // SYSTEM CONFIGURATION
-// ============================================================================
 
 model SystemConfig {
   id           String    @id @default("singleton") // Singleton pattern
