@@ -1,8 +1,6 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// Production-grade Prisma schema for custodial stock trading platform
+// Database is the source of truth for all user balances and trades
+// On-chain programs handle aggregate fund custody and settlement finality
 
 generator client {
   provider = "prisma-client"
