@@ -15,6 +15,9 @@
         "@coral-xyz/anchor": "^0.32.1",
         "@solana/web3.js": "^1.98.4",
         "pino": "^9.5.0",
-        "@repo/db": "workspace:*"
+        "@repo/db": "workspace:*",
+        "@repo/ledger": "workspace:*",
+        "@repo/solana": "workspace:*",
+        "@repo/shared": "workspace:*"
     }
 }
