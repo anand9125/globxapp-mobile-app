@@ -77,7 +77,7 @@ export async function getVaultTokenBalance(client: SolanaClient, vault_kind: Vau
     return BigInt(balance.value.amount);
 }
 
-export async function getAllVaultBalance(
+export async function getAllVaultBalances(
     client: SolanaClient,
     tokenMint: PublicKey
 ): Promise<{
