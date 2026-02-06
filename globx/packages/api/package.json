@@ -15,6 +15,7 @@
     "@repo/shared": "workspace:*",
     "@repo/db": "workspace:*",
     "@repo/solana": "workspace:*",
+    "@repo/ledger": "workspace:*",
     "pino": "^9.5.0",
     "pino-http": "^10.2.0"
   },
