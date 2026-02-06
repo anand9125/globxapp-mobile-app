@@ -1,8 +1,17 @@
 import { AnchorError, AnchorProvider, Program } from "@coral-xyz/anchor";
 import { getProgramId, GlobxIDL, PublicKey, SolanaClient } from "@repo/solana";
-import { PrismaClient } from "../../db/src";
 import { LedgerService } from "@repo/ledger";
 import { logger } from "./logger";
+import { checkForReorgs } from "./reorg";
+import {
+  processDepositReceivedEvent,
+  processEvent,
+  processSwapExecutedEvent,
+  processSwapFailedEvent,
+  processVaultToUserWithdrawalEvent,
+} from "./processor";
+import { checkFinality } from "./finality";
+import { PrismaClient } from "@repo/db";
 
 export interface IndexerConfig {
   reorgCheckIntervalMs: number;
@@ -15,112 +24,226 @@ export const DEFAULT_INDEXER_CONFIG: IndexerConfig = {
 };
 
 export class IndexerService {
-    private program: Program<any>;
-    private eventListener: Map<string, any> = new Map();
-    private reorgCheckInterval?: NodeJS.Timeout;
-    private finalityCheckInterval?: NodeJS.Timeout;
+  private program: Program<any>;
+  private eventListener: Map<string, any> = new Map();
+  private reorgCheckInterval?: NodeJS.Timeout;
+  private finalityCheckInterval?: NodeJS.Timeout;
 
-    constructor(
-        private client: SolanaClient,
-        private prisma: PrismaClient,
-        private ledgerService: LedgerService,
-        private config: IndexerConfig = DEFAULT_INDEXER_CONFIG,
-    )
-    {
-        const provider = new AnchorProvider(
-            client.connection,
-            {} as any, // No wallet needed for event listening
-            { commitment: "confirmed" }
+  constructor(
+    private client: SolanaClient,
+    private prisma: PrismaClient,
+    private ledgerService: LedgerService,
+    private config: IndexerConfig = DEFAULT_INDEXER_CONFIG,
+  ) {
+    const provider = new AnchorProvider(
+      client.connection,
+      {} as any, // No wallet needed for event listening
+      { commitment: "confirmed" },
+    );
+    this.program = new Program(
+      GlobxIDL as any,
+      new PublicKey(getProgramId()) as any,
+      provider as any,
+    );
+  }
+
+  //Start listening to on-chain events
+
+  async start(): Promise<void> {
+    logger.info("Starting indexer service");
+    this.program.addEventListener(
+      "depositReceived",
+      async (event: any, slot: number, signature: string) => {
+        await this.handleEvent("depositReceived", event, slot, signature);
+      },
+    );
+
+    this.program.addEventListener(
+      "userToVaultDeposit",
+      async (event: any, slot: number, signature: string) => {
+        await this.handleEvent("userToVaultDeposit", event, slot, signature);
+      },
+    );
+
+    this.program.addEventListener(
+      "depositToMain",
+      async (event: any, slot: number, signature: string) => {
+        await this.handleEvent("depositToMain", event, slot, signature);
+      },
+    );
+
+    this.program.addEventListener(
+      "swapExecuted",
+      async (event: any, slot: number, signature: string) => {
+        await this.handleEvent("swapExecuted", event, slot, signature);
+      },
+    );
+
+    this.program.addEventListener(
+      "swapFailed",
+      async (event: any, slot: number, signature: string) => {
+        await this.handleEvent("swapFailed", event, slot, signature);
+      },
+    );
+
+    this.program.addEventListener(
+      "mainToWithdrawal",
+      async (event: any, slot: number, signature: string) => {
+        await this.handleEvent("mainToWithdrawal", event, slot, signature);
+      },
+    );
+
+    this.program.addEventListener(
+      "vaultToUserWithdrawal",
+      async (event: any, slot: number, signature: string) => {
+        await this.handleEvent("vaultToUserWithdrawal", event, slot, signature);
+      },
+    );
+
+    // Start reorg checking
+    this.reorgCheckInterval = setInterval(async () => {
+      try {
+        await checkForReorgs(this.prisma, this.client, this.ledgerService);
+      } catch (error) {
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "Error checking for reorgs",
         );
-        this.program = new Program(GlobxIDL as any, new PublicKey(getProgramId()) as any , provider as any);
+      }
+    }, this.config.reorgCheckIntervalMs);
+
+    // Start finality checking for tentative events
+    this.finalityCheckInterval = setInterval(async () => {
+      try {
+        await this.checkTentativeEventsFinality();
+      } catch (error) {
+        logger.error(
+          { error: error instanceof Error ? error.message : String(error) },
+          "Error checking finality",
+        );
+      }
+    }, this.config.finalityCheckIntervalMs);
+
+    logger.info("Indexer service started");
+  }
+
+  //Stop listening to events
+
+  async stop(): Promise<void> {
+    logger.info("Stopping indexer service");
+
+    // Remove all event listeners
+    for (const [eventName, listener] of this.eventListener.entries()) {
+      this.program.removeEventListener(listener);
     }
 
-    //Start listening to on-chain events
+    this.eventListener.clear();
 
-    async start(): Promise<void>{
-        logger.info("Starting indexer service");
-        this.program.addEventListener("depositReceived", async (event: any, slot: number, signature: string) => {
-            await this.handleEvent("depositReceived", event, slot, signature);
-          });
-      
-          this.program.addEventListener("userToVaultDeposit", async (event: any, slot: number, signature: string) => {
-            await this.handleEvent("userToVaultDeposit", event, slot, signature);
-          });
-      
-          this.program.addEventListener("depositToMain", async (event: any, slot: number, signature: string) => {
-            await this.handleEvent("depositToMain", event, slot, signature);
-          });
-      
-          this.program.addEventListener("swapExecuted", async (event: any, slot: number, signature: string) => {
-            await this.handleEvent("swapExecuted", event, slot, signature);
-          });
-      
-          this.program.addEventListener("swapFailed", async (event: any, slot: number, signature: string) => {
-            await this.handleEvent("swapFailed", event, slot, signature);
-          });
-      
-          this.program.addEventListener("mainToWithdrawal", async (event: any, slot: number, signature: string) => {
-            await this.handleEvent("mainToWithdrawal", event, slot, signature);
-          });
-      
-          this.program.addEventListener("vaultToUserWithdrawal", async (event: any, slot: number, signature: string) => {
-            await this.handleEvent("vaultToUserWithdrawal", event, slot, signature);
-          });
-      
-          // Start reorg checking
-          this.reorgCheckInterval = setInterval(async () => {
-            try {
-              await checkForReorgs(this.prisma, this.client, this.ledgerService);
-            } catch (error) {
-              logger.error({ error: error instanceof Error ? error.message : String(error) }, "Error checking for reorgs");
-            }
-          }, this.config.reorgCheckIntervalMs);
-      
-          // Start finality checking for tentative events
-          this.finalityCheckInterval = setInterval(async () => {
-            try {
-              await this.checkTentativeEventsFinality();
-            } catch (error) {
-              logger.error({ error: error instanceof Error ? error.message : String(error) }, "Error checking finality");
-            }
-          }, this.config.finalityCheckIntervalMs);
-      
-          logger.info("Indexer service started");
+    // Clear intervals
+    if (this.reorgCheckInterval) {
+      clearInterval(this.reorgCheckInterval);
+    }
+    if (this.finalityCheckInterval) {
+      clearInterval(this.finalityCheckInterval);
     }
 
-    //Stop listening to events
+    logger.info("Indexer service stopped");
+  }
 
-    async stop(): Promise<void> {
-        logger.info("Stopping indexer service");
+  //Handle a single event
 
-        // Remove all event listeners
-        for (const [eventName , listener] of this.eventListener.entries()){
-            this.program.removeEventListener(listener);
-        }
+  private async handleEvent(
+    eventType: string,
+    eventData: any,
+    slot: number,
+    signature: string,
+  ): Promise<void> {
+    try {
+      const blockTime = await this.client.getBlockTime(slot);
 
-        this.eventListener.clear();
+      // Process event and store in DB
+      const eventId = await processEvent(this.prisma, this.client, {
+        name: eventType,
+        data: eventData,
+        txSignature: signature,
+        slot,
+        blockTime,
+      });
 
-        // Clear intervals
-        if (this.reorgCheckInterval){
-            clearInterval(this.reorgCheckInterval);
-        }
-        if (this.finalityCheckInterval){
-            clearInterval(this.finalityCheckInterval);
-        }
-
-        logger.info("Indexer service stopped");
+      await this.processEventData(eventType, eventData, eventId);
+    } catch (error) {
+      logger.error(
+        {
+          eventType,
+          signature,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Error handling event",
+      );
     }
+  }
+  // Process event-specific data
 
-    //Handle a single event
-
-    private async handleEvent(entryType: string, eventData: any, slot: number, signature: string): Promise<void>{
-        try{
-            const blockTime = await this.client.getBlockTime(slot);
-
-            // Process event and store in DB
-            
-        } catch {
-            
-        }
+  private async processEventData(
+    eventType: string,
+    eventData: any,
+    eventId: bigint,
+  ): Promise<void> {
+    switch (eventType) {
+      case "depositReceived":
+        await processDepositReceivedEvent(this.prisma, eventData, eventId);
+        break;
+      case "swapExecuted":
+        await processSwapExecutedEvent(this.prisma, eventData, eventId);
+        break;
+      case "swapFailed":
+        await processSwapFailedEvent(this.prisma, eventData, eventId);
+        break;
+      case "vaultToUserWithdrawal":
+        await processVaultToUserWithdrawalEvent(
+          this.prisma,
+          eventData,
+          eventId,
+        );
+        break;
+      default:
+        logger.debug({ eventType }, "No specific processing for event type");
     }
+  }
+
+  // Check finality of tentative events
+
+  private async checkTentativeEventsFinality(): Promise<void> {
+    const tentativeEvents = await this.prisma.onChainEvent.findMany({
+      where: { status: "TENTATIVE" },
+      take: 100,
+    });
+
+    for (const event of tentativeEvents) {
+      try {
+        const result = await checkFinality(this.client, event.txSignature);
+
+        if (result.finalized) {
+          await this.prisma.onChainEvent.update({
+            where: { id: event.id },
+            data: {
+              status: "FINALIZED",
+              confirmations: result.confirmations,
+              finalizedAt: new Date(),
+            },
+          });
+
+          logger.info({ eventId: event.id }, "Event finalized");
+        }
+      } catch (error) {
+        logger.error(
+          {
+            eventId: event.id,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          "Error checking event finality",
+        );
+      }
+    }
+  }
 }
