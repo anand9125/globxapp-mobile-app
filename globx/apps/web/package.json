@@ -11,12 +11,17 @@
     "check-types": "next typegen && tsc --noEmit"
   },
   "dependencies": {
+    "@auth/prisma-adapter": "^2.7.4",
+    "@repo/db": "workspace:*",
     "@repo/ui": "workspace:*",
+    "bcryptjs": "^2.4.3",
     "next": "16.1.0",
+    "next-auth": "^5.0.0-beta.25",
     "react": "^19.2.0",
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "@repo/eslint-config": "workspace:*",
     "@repo/typescript-config": "workspace:*",
     "@types/node": "^22.15.3",
