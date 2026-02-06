@@ -13,7 +13,7 @@ export const apiRateLimiter = rateLimit({
     legacyHeaders: false,
 });
 
-export const adminRateLimiter = rateLimit({
+export const strictRateLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes\
     max: 10, // Stricter limit for sensitive endpoints
     message: {

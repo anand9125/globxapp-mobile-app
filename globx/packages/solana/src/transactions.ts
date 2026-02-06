@@ -37,7 +37,7 @@ export interface SwapTransactionParams {
 }
 
 export interface WithdrawalTransactionParams {
-    destinationAddress: PublicKey; // User's destination wallet address
+    destinationAccount: PublicKey; // User's destination wallet address
     tokenMint: PublicKey;
     amount: BN;
     withdrawalId: Buffer; // 32-byte withdrawal ID
@@ -228,7 +228,7 @@ export async function buildWithdrawalToUserTransaction(
         config: config,
         withdrawalVault: withdrawalVault,
         vaultTokenAccount: vaultTokenAccount,
-        destinationTokenAccount: params.destinationAddress,
+        destinationTokenAccount: params.destinationAccount,
         tokenMint: params.tokenMint,
         tokenProgram: TOKEN_PROGRAM_ID,
     }).instruction();
