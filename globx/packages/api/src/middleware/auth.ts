@@ -1,3 +1,5 @@
+// Authentication middleware – verifies NextAuth JWT (same AUTH_SECRET).
+
 import { Request, Response, NextFunction } from "express";
 import * as jose from "jose";
 import type { PrismaClient } from "@repo/db";
@@ -18,8 +20,8 @@ export function authMiddleware(prisma: PrismaClient) {
 
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
             return res.status(401).json({
-                error: "Unauthorized",
-                message: "Missing or invalid authentication token",
+                error: "UNAUTHORIZED",
+                message: "Missing or invalid authorization header",
             });
         }
 
@@ -32,7 +34,7 @@ export function authMiddleware(prisma: PrismaClient) {
             const userId = payload.sub;
             if (!userId || typeof userId !== "string") {
                 return res.status(401).json({
-                    error: "Unauthorized",
+                    error: "UNAUTHORIZED",
                     message: "Invalid token payload",
                 });
 
@@ -44,8 +46,8 @@ export function authMiddleware(prisma: PrismaClient) {
 
             if (!user || !user.isActive) {
                 return res.status(401).json({
-                    error: "Unauthorized",
-                    message: "User is not found or inactive",
+                    error: "UNAUTHORIZED",
+                    message: "User not found or inactive",
                 });
             }
 
@@ -58,14 +60,14 @@ export function authMiddleware(prisma: PrismaClient) {
         } catch (error) {
             const message = error instanceof jose.errors.JWTExpired ? "Token expired" : "Invalid token";
             return res.status(401).json({
-                error: "Unauthorized",
+                error: "UNAUTHORIZED",
                 message: message,
             });
         }
     };
 }
 
-// optional auth middleware that always calls the next funciton 
+// optional auth middleware that always calls the next function 
 
 export function optionalAuthMiddleware(prisma: PrismaClient) {
 
@@ -73,7 +75,7 @@ export function optionalAuthMiddleware(prisma: PrismaClient) {
 
         const authHeader = req.headers.authorization;
 
-        if (authHeader && authHeader.startsWith("Bearer") && AUTH_SECRET) {
+        if (authHeader && authHeader.startsWith("Bearer ") && AUTH_SECRET) {
             try {
                 const token = authHeader.substring(7);
                 const secret = new TextEncoder().encode(AUTH_SECRET);
@@ -92,10 +94,10 @@ export function optionalAuthMiddleware(prisma: PrismaClient) {
                     }
                 }
             } catch {
-
+                // Ignore; leaves the req.user field undefined
             }
+        }
 
-            next();
-        };
+        next();
     }
 }
