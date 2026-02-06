@@ -7,12 +7,16 @@
     "check-types": "tsc --noEmit"
   },
   "dependencies": {
-    "@repo/db": "workspace:*",
+    "bullmq": "^5.22.2",
     "express": "^5.2.1",
+    "jose": "^5.9.6",
+    "zod": "^3.23.8",
     "express-rate-limit": "^7.4.1",
+    "@repo/shared": "workspace:*",
+    "@repo/db": "workspace:*",
+    "@repo/solana": "workspace:*",
     "pino": "^9.5.0",
-    "pino-http": "^10.2.0",
-    "zod": "^4.3.6"
+    "pino-http": "^10.2.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",
