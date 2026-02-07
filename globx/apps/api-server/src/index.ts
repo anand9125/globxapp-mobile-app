@@ -1,4 +1,10 @@
 import "dotenv/config";
+import { config as loadEnv } from "dotenv";
+import path from "path";
+
+// Load packages/db/.env so DATABASE_URL is set when running from monorepo root (e.g. pnpm dev)
+loadEnv({ path: path.resolve(process.cwd(), "packages/db/.env") });
+
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { createServer } from "@repo/api";
 import { prisma } from "@repo/db";

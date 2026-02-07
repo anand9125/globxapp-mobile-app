@@ -1,5 +1,5 @@
 import { AnchorError, AnchorProvider, Program } from "@coral-xyz/anchor";
-import { getProgramId, GlobxIDL, PublicKey, SolanaClient } from "@repo/solana";
+import { GlobxIDL, SolanaClient } from "@repo/solana";
 import { LedgerService } from "@repo/ledger";
 import { logger } from "./logger";
 import { checkForReorgs } from "./reorg";
@@ -43,11 +43,7 @@ export class IndexerService {
     // Use IDL without accounts so Anchor doesn't build account coders (we only need events).
     // Our IDL account defs lack type layouts, which causes Program to throw when building AccountClient.
     const idlForEvents = { ...GlobxIDL, accounts: [] };
-    this.program = new Program(
-      idlForEvents as any,
-      new PublicKey(getProgramId()) as any,
-      provider as any,
-    );
+    this.program = new Program(idlForEvents as any, provider as any);
   }
 
   //Start listening to on-chain events
