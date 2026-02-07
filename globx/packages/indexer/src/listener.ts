@@ -40,8 +40,11 @@ export class IndexerService {
       {} as any, // No wallet needed for event listening
       { commitment: "confirmed" },
     );
+    // Use IDL without accounts so Anchor doesn't build account coders (we only need events).
+    // Our IDL account defs lack type layouts, which causes Program to throw when building AccountClient.
+    const idlForEvents = { ...GlobxIDL, accounts: [] };
     this.program = new Program(
-      GlobxIDL as any,
+      idlForEvents as any,
       new PublicKey(getProgramId()) as any,
       provider as any,
     );
