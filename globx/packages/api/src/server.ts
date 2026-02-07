@@ -15,51 +15,76 @@ import { createPortfolioRouter } from "./routes/v1/portfolio";
 import { createSystemRouter } from "./routes/v1/system";
 
 const logger = pino({
-    level: process.env.LOG_LEVEL || "info",
-})
+  level: process.env.LOG_LEVEL || "info",
+});
 
 export interface CreateServerOptions {
-    ledgerService?: LedgerService;
-    tradesQueue?: Queue;
-    withdrawalsQueue?: Queue;
+  ledgerService?: LedgerService;
+  tradesQueue?: Queue;
+  withdrawalsQueue?: Queue;
 }
 
 export function createServer(
-    prisma: PrismaClient,
-    solanaClient: SolanaClient,
-    options?: CreateServerOptions
+  prisma: PrismaClient,
+  solanaClient: SolanaClient,
+  options?: CreateServerOptions,
 ): Express {
-    const app = express();
-    const opts = options ?? {};
+  const app = express();
+  const opts = options ?? {};
 
-    app.use(express.json());
-    app.use(pinoHttp({ logger }));
-    app.use(apiRateLimiter);
+  app.use(express.json());
+  app.use(pinoHttp({ logger }));
+  app.use(apiRateLimiter);
 
-    app.get("/health", async (req, res) => {
-        res.json({ status: "ok" });
-    });
+  app.get("/health", async (req, res) => {
+    res.json({ status: "ok" });
+  });
 
-    const v1Router = express.Router();
+  const v1Router = express.Router();
 
-    v1Router.use("/deposits", authMiddleware(prisma), strictRateLimiter, createDepositRouter(prisma, solanaClient));
-    v1Router.use("/trades", authMiddleware(prisma), strictRateLimiter, createTradesRouter(prisma, opts.ledgerService, opts.tradesQueue));
-    v1Router.use("/withdrawals", authMiddleware(prisma), strictRateLimiter, createWithdrawalsRouter(prisma, opts.ledgerService ?? null, opts.withdrawalsQueue));
-    v1Router.use("/", authMiddleware(prisma), createPortfolioRouter(prisma));
-    v1Router.use("/system", createSystemRouter(prisma, solanaClient));
+  v1Router.use(
+    "/deposits",
+    authMiddleware(prisma),
+    strictRateLimiter,
+    createDepositRouter(prisma, solanaClient),
+  );
+  v1Router.use(
+    "/trades",
+    authMiddleware(prisma),
+    strictRateLimiter,
+    createTradesRouter(prisma, opts.ledgerService, opts.tradesQueue),
+  );
+  v1Router.use(
+    "/withdrawals",
+    authMiddleware(prisma),
+    strictRateLimiter,
+    createWithdrawalsRouter(
+      prisma,
+      opts.ledgerService ?? null,
+      opts.withdrawalsQueue,
+    ),
+  );
+  v1Router.use("/", authMiddleware(prisma), createPortfolioRouter(prisma));
+  v1Router.use("/system", createSystemRouter(prisma, solanaClient));
 
-    v1Router.use(idempotencyMiddleware(prisma));
+  v1Router.use(idempotencyMiddleware(prisma));
 
-    app.use("/v1", v1Router);
+  app.use("/v1", v1Router);
 
-    app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-        logger.error({ err }, "Unhandled error");
-        res.status(err.status || 500).json({
-            error: err.code || "INTERNAL_ERROR",
-            message: err.message || "An unexpected error occurred",
-        });
-    });
+  app.use(
+    (
+      err: any,
+      req: express.Request,
+      res: express.Response,
+      next: express.NextFunction,
+    ) => {
+      logger.error({ err }, "Unhandled error");
+      res.status(err.status || 500).json({
+        error: err.code || "INTERNAL_ERROR",
+        message: err.message || "An unexpected error occurred",
+      });
+    },
+  );
 
-    return app;
-
+  return app;
 }

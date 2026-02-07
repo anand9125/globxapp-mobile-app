@@ -13,7 +13,7 @@ const logger = pino({
 export async function processReconciliationJob(
   job: Job,
   prisma: PrismaClient,
-  solanaClient: SolanaClient
+  solanaClient: SolanaClient,
 ): Promise<void> {
   logger.info({ jobId: job.id }, "Processing reconciliation job");
 
@@ -29,13 +29,13 @@ export async function processReconciliationJob(
         mismatches: result.mismatches.length,
         systemFrozen: result.systemFrozen,
       },
-      "Reconciliation job completed"
+      "Reconciliation job completed",
     );
 
     if (result.mismatches.length > 0) {
       logger.warn(
         { mismatches: result.mismatches },
-        "Reconciliation mismatches detected"
+        "Reconciliation mismatches detected",
       );
     }
   } catch (error) {
@@ -44,7 +44,7 @@ export async function processReconciliationJob(
         jobId: job.id,
         error: error instanceof Error ? error.message : String(error),
       },
-      "Reconciliation job failed"
+      "Reconciliation job failed",
     );
     throw error;
   }

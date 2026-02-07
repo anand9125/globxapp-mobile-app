@@ -12,13 +12,13 @@ export interface FinalityConfig {
 //Check if transaction has reached required confirmations
 
 export const DEFAULT_FINALITY_CONFIG: FinalityConfig = {
+  // this tells the no. of slots that have confirmed this transaction (Increase the requriered confirmations to decrease the chances of a reorg)
   requiredConfirmations: 32, // Solana finalized commitment
   checkIntervalMs: 1000, // Check every second
   maxWaitTimeMs: 60000, // Max 60 seconds
 };
 
 //Check if transaction has reached required confirmations
-
 export async function checkFinality(
   client: SolanaClient,
   signature: string,
@@ -34,6 +34,7 @@ export async function checkFinality(
     return { finalized: false, confirmations: 0 };
   }
 
+  // this tells the no. of slots that have confirmed this transaction
   const confirmations = status.value.confirmations || 0;
   const slot = status.value.slot || undefined;
 
@@ -45,7 +46,6 @@ export async function checkFinality(
 }
 
 //Wait for transaction finality
-
 export async function waitForFinality(
   client: SolanaClient,
   signature: string,
@@ -57,6 +57,8 @@ export async function waitForFinality(
     if (result.finalized) {
       return result;
     }
+
+    // wait for the next check
     await new Promise((resolve) => setTimeout(resolve, config.checkIntervalMs));
   }
 
@@ -65,9 +67,9 @@ export async function waitForFinality(
 }
 
 //Get current slot and calculate lag
-
-export async function getSlotaLag(
+export async function getSlotLag(
   client: SolanaClient,
+  // the slot of the event that we are indexing
   eventSlot: number,
 ): Promise<{
   currentSlot: number;

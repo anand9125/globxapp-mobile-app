@@ -18,12 +18,17 @@ const middleware = auth((req: any) => {
 
   if (!isLoggedIn) {
     const signIn = new URL("/auth/signin", req.nextUrl.origin);
-    signIn.searchParams.set("callbackUrl", req.nextUrl.pathname + req.nextUrl.search);
+    signIn.searchParams.set(
+      "callbackUrl",
+      req.nextUrl.pathname + req.nextUrl.search,
+    );
     return Response.redirect(signIn);
   }
 });
 
 export default middleware as unknown as NextMiddleware;
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+  ],
 };

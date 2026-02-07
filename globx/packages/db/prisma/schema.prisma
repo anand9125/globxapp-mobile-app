@@ -1,4 +1,4 @@
-// Production-grade Prisma schema for custodial stock trading platform
+// Prisma schema
 // Database is the source of truth for all user balances and trades
 // On-chain programs handle aggregate fund custody and settlement finality
 

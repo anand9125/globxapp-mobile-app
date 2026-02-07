@@ -39,7 +39,7 @@ export function createPortfolioRouter(prisma: PrismaClient): Router {
         })),
       });
     } catch (error) {
-        console.error("Error fetching portfolio:", error);
+      console.error("Error fetching portfolio:", error);
       res.status(500).json({
         error: "INTERNAL_ERROR",
         message: "Failed to fetch portfolio",

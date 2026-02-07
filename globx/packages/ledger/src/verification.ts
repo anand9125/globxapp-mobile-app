@@ -42,7 +42,9 @@ export class LedgerVerificationService {
           previousHash: string | null;
         })[],
       );
+
       return { valid: true };
+      
     } catch (error) {
       return {
         valid: false,

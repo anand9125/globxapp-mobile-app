@@ -10,8 +10,8 @@ const WITHDRAWAL_2FA_THRESHOLD = process.env.WITHDRAWAL_2FA_THRESHOLD ?? "0";
 
 export function createWithdrawalsRouter(
   prisma: PrismaClient,
-  ledgerService: LedgerService | null ,
-  withdrawalsQueue?: Queue | null ,
+  ledgerService: LedgerService | null,
+  withdrawalsQueue?: Queue | null,
 ): Router {
   const router = Router();
 

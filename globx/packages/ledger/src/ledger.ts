@@ -14,7 +14,7 @@ import {
 import { getLatestEntryHash, hashEntry } from "./hash_chain";
 
 export class LedgerService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: PrismaClient) { }
 
   async createTransaction(
     transaction: DoubleEntryTransaction,
@@ -282,7 +282,7 @@ export class LedgerService {
   //DR: EQUITY_USER (user's equity decreases)
   //CR: ASSET_CASH (user's cash decreases)
 
-  async recordWithdrawl(
+  async recordWithdrawal(
     userId: string,
     tokenMint: string,
     amount: bigint | string,
@@ -485,6 +485,7 @@ export class LedgerService {
       where: {
         userId,
         tokenMint,
+        accountType: { in: ["ASSET_CASH", "ASSET_STOCK"] },
       },
       _sum: {
         amount: true,

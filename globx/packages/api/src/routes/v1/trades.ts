@@ -9,13 +9,12 @@ import { InsufficientBalanceError } from "@repo/shared";
 export function createTradesRouter(
   prisma: PrismaClient,
   ledgerService?: LedgerService | null,
-  tradesQueue?: Queue | null
+  tradesQueue?: Queue | null,
 ): Router {
   const router = Router();
 
-
-   //POST /v1/trades/execute
-   //Execute a trade (buy or sell stock tokens)
+  //POST /v1/trades/execute
+  //Execute a trade (buy or sell stock tokens)
   router.post("/execute", async (req: Request, res: Response) => {
     try {
       const body = executeTradeSchema.parse(req.body);
@@ -23,7 +22,11 @@ export function createTradesRouter(
 
       if (ledgerService) {
         try {
-          await ledgerService.verifyBalance(user.id, body.inputTokenMint, body.inputAmount);
+          await ledgerService.verifyBalance(
+            user.id,
+            body.inputTokenMint,
+            body.inputAmount,
+          );
         } catch (err) {
           if (err instanceof InsufficientBalanceError) {
             return res.status(402).json({

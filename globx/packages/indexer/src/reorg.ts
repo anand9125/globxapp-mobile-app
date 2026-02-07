@@ -19,12 +19,14 @@ export interface ReorgDetectionResult {
 export async function detectReorg(
   prisma: PrismaClient,
   client: SolanaClient,
+  // the slot of the event that we are indexing
   currentSlot: number,
 ): Promise<ReorgDetectionResult> {
   // Get all finalized events from recent slots
   const recentEvents = await prisma.onChainEvent.findMany({
     where: {
-      status: "FINALIZED",
+      status: "FINALIZED", // todo: why are we checking status finzalised
+      // greater then or equal to the current slot minus 100
       slot: {
         gte: BigInt(currentSlot - 100),
       },
