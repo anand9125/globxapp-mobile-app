@@ -29,7 +29,9 @@ const solanaClient = new SolanaClient({
 
 const ledgerService = new LedgerService(prisma);
 
-const redis = new Redis(REDIS_URL);
+const redis = new Redis(REDIS_URL, {
+  maxRetriesPerRequest: null,
+});
 
 const reconciliationQueue = new Queue("reconciliation", { connection: redis });
 reconciliationQueue.add("run", {}, { repeat: { every: 5 * 60 * 1000 } }).catch((err) => console.error("Failed to add repeatable job:", err));

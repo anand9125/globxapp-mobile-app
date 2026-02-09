@@ -2,7 +2,14 @@
 
 import { PublicKey } from "@solana/web3.js";
 
-const JUPITER_API_BASE = "https://api.jup.ag/";
+// Add at the top
+const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
+const isDevnet = SOLANA_RPC_URL.includes("devnet");
+
+// Replace the hardcoded line
+const JUPITER_API_BASE = isDevnet 
+  ? process.env.JUPITER_API_BASE_DEVNET || "https://quote-api.jup.ag/v6/"  // Verify devnet endpoint
+  : process.env.JUPITER_API_BASE || "https://api.jup.ag/";
 
 export interface JupiterQuoteParams {
   inputMint: string;
