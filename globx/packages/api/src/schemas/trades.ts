@@ -14,5 +14,5 @@ export const quoteTradeSchema = z.object({
   inputTokenMint: z.string().min(32).max(44),
   outputTokenMint: z.string().min(32).max(44),
   amount: z.string().regex(/^\d+$/),
-  slippageBps: z.number().int().min(0).max(10000).default(50),
+  slippageBps: z.coerce.number().int().min(0).max(10000).default(50), // Coerce string to number for query params
 });

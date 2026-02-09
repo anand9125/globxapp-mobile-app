@@ -7,6 +7,7 @@ import type { LedgerService } from "@repo/ledger";
 import type { Queue } from "bullmq";
 import { InsufficientBalanceError } from "@repo/shared";
 import { fetchJupiterQuote } from "@repo/solana";
+import { quoteRateLimiter, strictRateLimiter } from "../../middleware/rate-limit";
 
 const JUPITER_API_KEY = process.env.JUPITER_API_KEY;
 
@@ -20,10 +21,16 @@ export function createTradesRouter(
   /**
    * GET /v1/trades/quote
    * Fetch best price quote from Jupiter for a swap
+   * Uses more lenient rate limiting (30 requests per minute)
    */
-  router.get("/quote", async (req: Request, res: Response) => {
+  router.get("/quote", quoteRateLimiter, async (req: Request, res: Response) => {
     try {
       const query = quoteTradeSchema.parse(req.query);
+      
+      if (!JUPITER_API_KEY) {
+        console.warn("JUPITER_API_KEY is not set. Quote requests may fail.");
+      }
+      
       const quote = await fetchJupiterQuote(
         {
           inputMint: query.inputTokenMint,
@@ -48,6 +55,10 @@ export function createTradesRouter(
         return res.status(400).json({
           error: "VALIDATION_ERROR",
           message: "Invalid query parameters",
+          details: error.errors.map((e) => ({
+            path: e.path.join("."),
+            message: e.message,
+          })),
         });
       }
       console.error("Error fetching quote:", error);
@@ -59,9 +70,12 @@ export function createTradesRouter(
   });
 
   
-    //POST /v1/trades/execute
-    // Execute a trade (buy or sell stock tokens)
-  router.post("/execute", async (req: Request, res: Response) => {
+  /**
+   * POST /v1/trades/execute
+   * Execute a trade (buy or sell stock tokens)
+   * Uses strict rate limiting (10 requests per 15 minutes)
+   */
+  router.post("/execute", strictRateLimiter, async (req: Request, res: Response) => {
     try {
       const body = executeTradeSchema.parse(req.body);
       const user = (req as any).user;

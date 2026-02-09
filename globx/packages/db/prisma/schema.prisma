@@ -18,12 +18,16 @@ model User {
   email          String    @unique
   emailVerified  DateTime?
   name           String?
-  authProvider   String 
-  authProviderId String? // Provider-specific ID (for OAuth)
+  authProvider   String    @default("email") // Default to "email", set to provider name for OAuth
+  authProviderId String? // Provider-specific ID (for OAuth) or hashed password for email
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   isActive       Boolean   @default(true)
   kycStatus      String?
+
+  // NextAuth relations
+  accounts Account[]
+  sessions Session[]
 
   // Relations
   deposits      Deposit[]
@@ -35,6 +39,49 @@ model User {
   @@index([email])
   @@index([authProvider, authProviderId])
   @@map("users")
+}
+
+// NextAuth required tables
+model Account {
+  id                String  @id @default(uuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(uuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([sessionToken])
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
 }
 
 // DOUBLE-ENTRY LEDGER (IMMUTABLE, APPEND-ONLY)

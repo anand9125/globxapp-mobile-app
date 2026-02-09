@@ -17,6 +17,17 @@ import { IndexerService } from "@repo/indexer";
 import { Queue, Worker } from "bullmq";
 import { processReconciliationJob, processTradeExecutionJob } from "@repo/queue";
 import Redis from "ioredis";
+import { createServer as createHttpServer } from "http";
+
+// Supported tokenized stocks (Backed Finance tokens)
+const supportedTokens = [
+  "XsDoVfqeBukxuZHWhdvWHBhgEHjGNst4MLodqsJHzoB", // xxTSLA
+  "XsbEhLAtcf6HdfpFZ5xEMdqW8nfAvcsP5bdudRLJzJp", // xxAAPL
+  "XsCPL9dNWBMvFtTmwcCA5v3xWPSMEBCszbQdiLLq6aN", // xxGOOGL
+  "Xs3eBt7uRfJX8QUs4suhyU8p2M6DoUDrJyWBa8LLZsg", // xxAMZN
+  "XspzcW1PRtgf6Wj92HCiZdjzKCyFekVD8P5Ueh3dRMX", // xxMSFT
+  "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh", // xxNVDA
+];
 
 const PORT = process.env.PORT || 3000;
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
@@ -105,11 +116,19 @@ const withdrawalsWorker = new Worker(
   { connection: redis }
 );
 
-const app = createServer(prisma, solanaClient, {
+// Create Express app first
+const { app, createWebSocketService } = createServer(prisma, solanaClient, {
   ledgerService,
   tradesQueue,
   withdrawalsQueue,
+  supportedTokens,
 });
+
+// Create HTTP server with Express app
+const httpServer = createHttpServer(app);
+
+// Initialize WebSocket on HTTP server
+const wsService = createWebSocketService(httpServer);
 
 const indexer = new IndexerService(solanaClient, prisma, ledgerService);
 
@@ -117,12 +136,14 @@ async function start() {
   try {
     await indexer.start();
 
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
       console.log(`API server listening on port ${PORT}`);
+      console.log(`WebSocket server available at ws://localhost:${PORT}/ws`);
     });
 
     process.on("SIGTERM", async () => {
       console.log("Shutting down...");
+      wsService.cleanup();
       await indexer.stop();
       await reconciliationWorker.close();
       await tradesWorker.close();
