@@ -1,20 +1,66 @@
 //Trade API routes
 import { Router, Request, Response } from "express";
-import { executeTradeSchema } from "../../schemas/trades";
+import { z } from "zod";
+import { executeTradeSchema, quoteTradeSchema } from "../../schemas/trades";
 import type { PrismaClient } from "@repo/db";
 import type { LedgerService } from "@repo/ledger";
 import type { Queue } from "bullmq";
 import { InsufficientBalanceError } from "@repo/shared";
+import { fetchJupiterQuote } from "@repo/solana";
+
+const JUPITER_API_KEY = process.env.JUPITER_API_KEY;
 
 export function createTradesRouter(
   prisma: PrismaClient,
   ledgerService?: LedgerService | null,
-  tradesQueue?: Queue | null,
+  tradesQueue?: Queue | null
 ): Router {
   const router = Router();
 
-  //POST /v1/trades/execute
-  //Execute a trade (buy or sell stock tokens)
+  /**
+   * GET /v1/trades/quote
+   * Fetch best price quote from Jupiter for a swap
+   */
+  router.get("/quote", async (req: Request, res: Response) => {
+    try {
+      const query = quoteTradeSchema.parse(req.query);
+      const quote = await fetchJupiterQuote(
+        {
+          inputMint: query.inputTokenMint,
+          outputMint: query.outputTokenMint,
+          amount: Number(query.amount),
+          slippageBps: query.slippageBps,
+        },
+        { apiKey: JUPITER_API_KEY }
+      );
+      return res.json({
+        inputMint: quote.inputMint,
+        outputMint: quote.outputMint,
+        inAmount: quote.inAmount,
+        outAmount: quote.outAmount,
+        otherAmountThreshold: quote.otherAmountThreshold,
+        slippageBps: quote.slippageBps,
+        priceImpactPct: quote.priceImpactPct,
+        routePlan: quote.routePlan,
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({
+          error: "VALIDATION_ERROR",
+          message: "Invalid query parameters",
+        });
+      }
+      console.error("Error fetching quote:", error);
+      return res.status(502).json({
+        error: "QUOTE_ERROR",
+        message: error instanceof Error ? error.message : "Failed to fetch quote",
+      });
+    }
+  });
+
+  
+    //POST /v1/trades/execute
+    // Execute a trade (buy or sell stock tokens)
   router.post("/execute", async (req: Request, res: Response) => {
     try {
       const body = executeTradeSchema.parse(req.body);
@@ -22,11 +68,7 @@ export function createTradesRouter(
 
       if (ledgerService) {
         try {
-          await ledgerService.verifyBalance(
-            user.id,
-            body.inputTokenMint,
-            body.inputAmount,
-          );
+          await ledgerService.verifyBalance(user.id, body.inputTokenMint, body.inputAmount);
         } catch (err) {
           if (err instanceof InsufficientBalanceError) {
             return res.status(402).json({

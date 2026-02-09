@@ -8,9 +8,11 @@ import {
   deriveMainVaultPDA,
   deriveWithdrawalVaultPDA,
   deriveConfigPDA,
+  deriveTreasuryPDA,
   deriveVaultTokenAccountPDA,
 } from "./pda";
 import { GlobxIDL, getProgramId } from "./idl";
+import { JupiterAccountMeta } from "./jupiter";
 
 const TOKEN_PROGRAM_ID = new PublicKey(
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA",
@@ -138,19 +140,15 @@ export async function buildSwapTransaction(
   client: SolanaClient,
   params: SwapTransactionParams,
   jupiterProgramId: PublicKey,
-  jupiterAccounts: PublicKey[],
+  jupiterAccountMetas: JupiterAccountMeta[],
 ): Promise<Transaction> {
   const programId = new PublicKey(getProgramId());
   const [mainVault] = await deriveMainVaultPDA();
   const [config] = await deriveConfigPDA();
-  const inputTokenAccount = await deriveVaultTokenAccountPDA(
-    mainVault,
-    params.inputMint,
-  );
-  const outputTokenAccount = await deriveVaultTokenAccountPDA(
-    mainVault,
-    params.outputMint,
-  );
+  const [treasury] = await deriveTreasuryPDA();
+  const vaultInputToken = await deriveVaultTokenAccountPDA(mainVault, params.inputMint);
+  const vaultOutputToken = await deriveVaultTokenAccountPDA(mainVault, params.outputMint);
+  const treasuryInputToken = await deriveVaultTokenAccountPDA(treasury, params.inputMint);
 
   const provider = new AnchorProvider(client.connection, {} as any, {
     commitment: client.commitment,
@@ -163,7 +161,7 @@ export async function buildSwapTransaction(
   );
 
   const instruction = await (program as any).methods
-    .swap({
+    .executeSwap({
       amountIn: new BN(params.amountIn.toString()),
       amountUsd: new BN(params.amountUsd.toString()),
       minAmountOut: new BN(params.minAmountOut.toString()),
@@ -174,21 +172,22 @@ export async function buildSwapTransaction(
       data: Array.from(params.routeData),
     })
     .accounts({
-      authority: PublicKey.default,
-      config: config,
-      mainVault: mainVault,
-      inputTokenAccount,
-      outputTokenAccount,
+      vault: mainVault,
+      vaultInputToken,
+      vaultOutputToken,
       inputMint: params.inputMint,
       outputMint: params.outputMint,
+      config,
+      treasury,
+      treasuryInputToken,
       swapProgram: jupiterProgramId,
       tokenProgram: TOKEN_PROGRAM_ID,
     })
     .remainingAccounts(
-      jupiterAccounts.map((acc) => ({
-        pubkey: acc,
-        isWritable: true,
-        isSigner: false,
+      jupiterAccountMetas.map((acc) => ({
+        pubkey: acc.pubkey,
+        isWritable: acc.isWritable,
+        isSigner: acc.isSigner,
       })),
     )
     .instruction();
@@ -291,14 +290,13 @@ export async function buildWithdrawalToUserTransaction(
 
   return transaction;
 }
-
 export interface HSMSigner {
   signTransaction(transaction: Transaction): Promise<Transaction>;
   getPublicKey(): Promise<PublicKey>;
 }
 
-export class HSMSigner implements HSMSigner {
-  constructor(private keypair: any) {}
+export class MockHSMSigner implements HSMSigner {
+  constructor(private keypair: any) {} // Keypair type from @solana/web3.js
 
   async signTransaction(transaction: Transaction): Promise<Transaction> {
     transaction.sign(this.keypair);
@@ -309,3 +307,4 @@ export class HSMSigner implements HSMSigner {
     return this.keypair.publicKey;
   }
 }
+
