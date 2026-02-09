@@ -82,36 +82,75 @@ export function PriceProvider({ children }: PriceProviderProps) {
     enabled: true,
   });
 
-  // Fallback to HTTP polling if WebSocket fails after max reconnection attempts
-  // Only poll if WebSocket is not connected AND we've given up on reconnecting
+  // One-time initial price fetch when we have token (so UI shows prices before WS or poll)
+  const fetchPricesOnce = useCallback(async () => {
+    if (!token) return;
+    for (const stock of TOKENIZED_STOCKS) {
+      try {
+        const quote = await getTradeQuote(token, {
+          inputTokenMint: USDC.mint,
+          outputTokenMint: stock.mint,
+          amount: Math.pow(10, USDC.decimals).toString(),
+          slippageBps: 50,
+        });
+        const price = quote.outAmount / Math.pow(10, stock.decimals);
+        setPrices((prev) => {
+          const existing = prev[stock.mint];
+          return {
+            ...prev,
+            [stock.mint]: {
+              mint: stock.mint,
+              price,
+              change: existing?.change ?? 0,
+              changePercent: existing?.changePercent ?? 0,
+              timestamp: Date.now(),
+              volume24h: existing?.volume24h ?? 0,
+              high24h: existing?.high24h || price * 1.02,
+              low24h: existing?.low24h || price * 0.98,
+            },
+          };
+        });
+        await new Promise((r) => setTimeout(r, 400));
+      } catch {
+        // ignore per-token errors
+      }
+    }
+  }, [token]);
+
+  // Initial fetch once when token becomes available
+  useQuery({
+    queryKey: ["price-initial", token],
+    queryFn: async () => {
+      await fetchPricesOnce();
+      return null;
+    },
+    enabled: !!token && TOKENIZED_STOCKS.length > 0,
+    staleTime: 60_000,
+    refetchInterval: false,
+  });
+
+  // Fallback HTTP polling only when WebSocket is unavailable (less frequent)
   const shouldPoll = Boolean(!connected && wsError && wsError.message?.includes("unavailable"));
   const canPoll = Boolean(shouldPoll && !!token);
-  
-  // Poll prices via HTTP as fallback (only if WebSocket unavailable)
+
   useQuery({
     queryKey: ["price-poll", "fallback"],
     queryFn: async () => {
       if (!token) return null;
-      
-      // Fetch prices for all tokens sequentially to avoid rate limits
       for (const stock of TOKENIZED_STOCKS) {
         try {
           const quote = await getTradeQuote(token, {
             inputTokenMint: USDC.mint,
             outputTokenMint: stock.mint,
-            amount: Math.pow(10, USDC.decimals).toString(), // 1 USDC
+            amount: Math.pow(10, USDC.decimals).toString(),
             slippageBps: 50,
           });
-          
           const price = quote.outAmount / Math.pow(10, stock.decimals);
-          
-          // Get current price from state using functional update
           setPrices((prev) => {
             const existing = prev[stock.mint];
             const previousPrice = existing?.price || price;
             const change = price - previousPrice;
             const changePercent = previousPrice > 0 ? (change / previousPrice) * 100 : 0;
-
             return {
               ...prev,
               [stock.mint]: {
@@ -120,25 +159,22 @@ export function PriceProvider({ children }: PriceProviderProps) {
                 change,
                 changePercent,
                 timestamp: Date.now(),
-                volume24h: existing?.volume24h || 0,
+                volume24h: existing?.volume24h ?? 0,
                 high24h: existing?.high24h || price * 1.02,
                 low24h: existing?.low24h || price * 0.98,
               },
             };
           });
-
-          // Small delay between requests to avoid rate limiting
-          await new Promise((resolve) => setTimeout(resolve, 500));
-        } catch (error) {
-          // Silently fail for individual tokens
+          await new Promise((r) => setTimeout(r, 500));
+        } catch {
+          // ignore
         }
       }
-
       return null;
     },
     enabled: canPoll,
-    refetchInterval: canPoll ? 30000 : false, // Poll every 30s if WebSocket unavailable
-    staleTime: 10000,
+    refetchInterval: canPoll ? 60_000 : false,
+    staleTime: 30_000,
   });
 
   const getPrice = useCallback(

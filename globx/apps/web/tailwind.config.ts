@@ -16,7 +16,7 @@ const config: Config = {
           secondary: "#1A1A1F", // Card dark
           tertiary: "#232329", // Elevated dark
         },
-        // Accent colors (Institutional teal/green)
+        // Accent colors (Institutional teal/green) + shadcn compatibility
         accent: {
           primary: "#00D4AA", // Brand teal
           buy: "#00C853", // Vibrant green for buy/long
@@ -24,6 +24,8 @@ const config: Config = {
           light: "#33DDBA",
           dark: "#00A888",
           glow: "rgba(0, 212, 170, 0.2)",
+          DEFAULT: "hsl(var(--accent))",
+          foreground: "hsl(var(--accent-foreground))",
         },
         // Text hierarchy
         text: {
@@ -32,12 +34,17 @@ const config: Config = {
           muted: "#5A5A5E",
           disabled: "rgba(255, 255, 255, 0.3)",
         },
-        // Chart colors
+        // Chart colors (CEX + shadcn)
         chart: {
           green: "#00C853",
           red: "#FF3B5C",
           grid: "#1F1F24",
           bg: "#0D0D0F",
+          "1": "hsl(var(--chart-1))",
+          "2": "hsl(var(--chart-2))",
+          "3": "hsl(var(--chart-3))",
+          "4": "hsl(var(--chart-4))",
+          "5": "hsl(var(--chart-5))",
         },
         // Legacy Jupiter colors (for backward compatibility)
         jupiter: {
@@ -96,10 +103,6 @@ const config: Config = {
           DEFAULT: "hsl(var(--muted))",
           foreground: "hsl(var(--muted-foreground))",
         },
-        accent: {
-          DEFAULT: "hsl(var(--accent))",
-          foreground: "hsl(var(--accent-foreground))",
-        },
         destructive: {
           DEFAULT: "hsl(var(--destructive))",
           foreground: "hsl(var(--destructive-foreground))",
@@ -107,13 +110,6 @@ const config: Config = {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",
-        chart: {
-          "1": "hsl(var(--chart-1))",
-          "2": "hsl(var(--chart-2))",
-          "3": "hsl(var(--chart-3))",
-          "4": "hsl(var(--chart-4))",
-          "5": "hsl(var(--chart-5))",
-        },
       },
       fontFamily: {
         sans: ['"Inter"', "system-ui", "sans-serif"],

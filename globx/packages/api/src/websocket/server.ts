@@ -170,8 +170,8 @@ export class WebSocketService {
    * Start price update loop - fetches prices and broadcasts to subscribers
    */
   private startPriceUpdates(): void {
-    // Update prices every 5 seconds to avoid rate limiting
-    // With 6 tokens, that's ~72 requests/minute (under 60/min limit per token, but we batch)
+    // Update prices every 45 seconds to avoid rate limiting and reduce API load
+    const PRICE_INTERVAL_MS = 45_000;
     this.priceUpdateInterval = setInterval(async () => {
       if (this.supportedTokens.length === 0) return;
 
@@ -216,7 +216,7 @@ export class WebSocketService {
           // Continue with next token even if one fails
         }
       }
-    }, 5000); // Update every 5 seconds
+    }, PRICE_INTERVAL_MS);
   }
 
   /**

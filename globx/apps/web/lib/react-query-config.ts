@@ -45,7 +45,7 @@ export const queryConfigs = {
   quote: {
     staleTime: 10 * 1000, // 10 seconds
     gcTime: 30 * 1000, // 30 seconds
-    refetchInterval: false, // Only on user input
+    refetchInterval: false as const, // Only on user input
   },
 
   // Order book (real-time via WebSocket)

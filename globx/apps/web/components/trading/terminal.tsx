@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { motion } from "framer-motion";
 import { StockSelector } from "./StockSelector";
 import { TradingChart } from "./trading-chart";
 import { OrderBook } from "./order-book";
@@ -17,7 +17,14 @@ interface TradingTerminalProps {
 }
 
 export function TradingTerminal({ selectedStock, onStockSelect }: TradingTerminalProps) {
-  const stockInfo = TOKEN_MAP[selectedStock] || TOKENIZED_STOCKS[0];
+  const defaultStock = TOKENIZED_STOCKS[0];
+  const stockInfo = (TOKEN_MAP[selectedStock] ?? defaultStock) ?? {
+    mint: "",
+    symbol: "—",
+    name: "Unknown",
+    decimals: 8,
+    category: "tokenized_stock" as const,
+  };
   const priceData = usePrice(selectedStock);
   const price = priceData?.price || 0;
   const high24h = priceData?.high24h || price * 1.02;
@@ -25,9 +32,19 @@ export function TradingTerminal({ selectedStock, onStockSelect }: TradingTermina
   const volume24h = priceData?.volume24h || 0;
 
   return (
-    <div className="h-[calc(100vh-80px)] flex flex-col bg-bg-primary">
+    <motion.div
+      className="h-[calc(100vh-80px)] flex flex-col bg-bg-primary"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 0.25 }}
+    >
       {/* Top Bar - Stock Info & Price */}
-      <div className="border-b border-border bg-bg-secondary px-4 md:px-6 py-4">
+      <motion.div
+        className="border-b border-border bg-bg-secondary/95 backdrop-blur-sm px-4 md:px-6 py-4"
+        initial={{ y: -8 }}
+        animate={{ y: 0 }}
+        transition={{ duration: 0.3 }}
+      >
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <PriceDisplay stock={stockInfo} />
           <div className="flex items-center gap-4 md:gap-6 text-sm flex-wrap">
@@ -47,23 +64,29 @@ export function TradingTerminal({ selectedStock, onStockSelect }: TradingTermina
             </div>
           </div>
         </div>
-      </div>
+      </motion.div>
 
       {/* Main Trading Area */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* Left Sidebar - Stock Selector (hidden on mobile, shown on desktop) */}
-        <div className="hidden lg:block w-64 overflow-y-auto border-r border-border">
+        <motion.div
+          className="hidden lg:block w-64 overflow-y-auto border-r border-border bg-bg-secondary/50"
+          initial={{ opacity: 0, x: -12 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.1, duration: 0.3 }}
+        >
           <StockSelector selectedStock={selectedStock} onSelect={onStockSelect} />
-        </div>
+        </motion.div>
 
-        {/* Center - Chart & Order Book */}
         <div className="flex-1 flex flex-col min-w-0">
-          {/* Chart Area */}
-          <div className="flex-1 min-h-[300px] border-b border-border">
+          <motion.div
+            className="flex-1 min-h-[300px] border-b border-border"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.15, duration: 0.35 }}
+          >
             <TradingChart symbol={stockInfo.symbol} mint={selectedStock} />
-          </div>
+          </motion.div>
 
-          {/* Bottom - Order Book & Recent Trades */}
           <div className="h-64 flex flex-col md:flex-row border-t border-border">
             <div className="flex-1 border-b md:border-b-0 md:border-r border-border">
               <OrderBook symbol={stockInfo.symbol} tokenMint={selectedStock} />
@@ -74,16 +97,20 @@ export function TradingTerminal({ selectedStock, onStockSelect }: TradingTermina
           </div>
         </div>
 
-        {/* Right Sidebar - Order Form & Portfolio (stacked on mobile) */}
-        <div className="w-full lg:w-96 flex flex-col border-t lg:border-t-0 lg:border-l border-border">
+        <motion.div
+          className="w-full lg:w-96 flex flex-col border-t lg:border-t-0 lg:border-l border-border bg-bg-secondary/30"
+          initial={{ opacity: 0, x: 12 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ delay: 0.2, duration: 0.3 }}
+        >
           <div className="flex-1 overflow-y-auto">
             <OrderForm stock={stockInfo} currentPrice={price} />
           </div>
           <div className="border-t border-border">
             <PortfolioSummary />
           </div>
-        </div>
+        </motion.div>
       </div>
-    </div>
+    </motion.div>
   );
 }

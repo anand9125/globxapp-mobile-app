@@ -24,8 +24,8 @@ export function OrderBook({ symbol, tokenMint }: OrderBookProps) {
   const { data: tradesData } = useQuery({
     queryKey: ["recentTrades", tokenMint],
     queryFn: () => getRecentTrades(null, { tokenMint, limit: 100 }),
-    refetchInterval: 5000, // Poll every 5 seconds instead of 3
-    staleTime: 3000, // Consider data stale after 3 seconds
+    refetchInterval: 20_000,
+    staleTime: 10_000,
   });
 
   // Build order book from recent trades
@@ -88,16 +88,15 @@ export function OrderBook({ symbol, tokenMint }: OrderBookProps) {
   const midPrice = asks[0] && bids[0] ? (asks[0].price + bids[0].price) / 2 : 0;
 
   return (
-    <div className="h-full flex flex-col bg-jupiter-bg">
-      <div className="px-4 py-3 border-b border-jupiter-border bg-jupiter-surface">
-        <h3 className="text-sm font-semibold text-jupiter-text-primary">Order Book</h3>
+    <div className="h-full flex flex-col bg-bg-secondary">
+      <div className="px-4 py-3 border-b border-border bg-bg-tertiary">
+        <h3 className="text-sm font-semibold text-text-primary">Order Book</h3>
       </div>
 
       <div className="flex-1 overflow-hidden flex flex-col">
-        {/* Asks (Sell Orders) */}
         <div className="flex-1 overflow-y-auto">
           <div className="px-4 py-2">
-            <div className="grid grid-cols-3 gap-2 text-xs text-jupiter-text-tertiary mb-2">
+            <div className="grid grid-cols-3 gap-2 text-xs text-text-muted mb-2">
               <div className="text-right">Price</div>
               <div className="text-right">Amount</div>
               <div className="text-right">Total</div>
@@ -108,32 +107,30 @@ export function OrderBook({ symbol, tokenMint }: OrderBookProps) {
                 return (
                   <div
                     key={idx}
-                    className="grid grid-cols-3 gap-2 py-1 text-xs hover:bg-jupiter-surfaceHover rounded px-2 -mx-2 relative group"
+                    className="grid grid-cols-3 gap-2 py-1 text-xs hover:bg-bg-tertiary rounded px-2 -mx-2 relative group"
                   >
-                    <div className="absolute left-0 top-0 bottom-0 bg-jupiter-error/20" style={{ width: `${(ask.total / maxTotal) * 100}%` }} />
-                    <div className="text-right text-jupiter-error font-mono relative z-10">${ask.price.toFixed(2)}</div>
-                    <div className="text-right text-jupiter-text-secondary font-mono relative z-10">{ask.amount.toFixed(4)}</div>
-                    <div className="text-right text-jupiter-text-tertiary font-mono relative z-10">{ask.total.toFixed(4)}</div>
+                    <div className="absolute left-0 top-0 bottom-0 bg-accent-sell/20 rounded" style={{ width: `${(ask.total / maxTotal) * 100}%` }} />
+                    <div className="text-right text-accent-sell font-mono relative z-10">${ask.price.toFixed(2)}</div>
+                    <div className="text-right text-text-secondary font-mono relative z-10">{ask.amount.toFixed(4)}</div>
+                    <div className="text-right text-text-muted font-mono relative z-10">{ask.total.toFixed(4)}</div>
                   </div>
                 );
               })
             ) : (
-              <div className="text-center text-jupiter-text-tertiary text-xs py-4">No sell orders</div>
+              <div className="text-center text-text-muted text-xs py-4">No sell orders</div>
             )}
           </div>
         </div>
 
-        {/* Spread */}
-        <div className="px-4 py-2 border-y border-jupiter-border bg-jupiter-surface">
+        <div className="px-4 py-2 border-y border-border bg-bg-tertiary">
           <div className="text-center">
-            <div className="text-lg font-bold text-jupiter-text-primary">
+            <div className="text-lg font-bold text-text-primary">
               ${midPrice > 0 ? midPrice.toFixed(2) : "0.00"}
             </div>
-            <div className="text-xs text-jupiter-text-tertiary">Spread: ${spread.toFixed(2)}</div>
+            <div className="text-xs text-text-muted">Spread: ${spread.toFixed(2)}</div>
           </div>
         </div>
 
-        {/* Bids (Buy Orders) */}
         <div className="flex-1 overflow-y-auto">
           <div className="px-4 py-2">
             {bids.length > 0 ? (
@@ -142,19 +139,19 @@ export function OrderBook({ symbol, tokenMint }: OrderBookProps) {
                 return (
                   <div
                     key={idx}
-                    className="grid grid-cols-3 gap-2 py-1 text-xs hover:bg-jupiter-surfaceHover rounded px-2 -mx-2 relative group"
+                    className="grid grid-cols-3 gap-2 py-1 text-xs hover:bg-bg-tertiary rounded px-2 -mx-2 relative group"
                   >
-                    <div className="absolute left-0 top-0 bottom-0 bg-jupiter-success/20" style={{ width: `${(bid.total / maxTotal) * 100}%` }} />
-                    <div className="text-right text-jupiter-success font-mono relative z-10">${bid.price.toFixed(2)}</div>
-                    <div className="text-right text-jupiter-text-secondary font-mono relative z-10">{bid.amount.toFixed(4)}</div>
-                    <div className="text-right text-jupiter-text-tertiary font-mono relative z-10">{bid.total.toFixed(4)}</div>
+                    <div className="absolute left-0 top-0 bottom-0 bg-accent-buy/20 rounded" style={{ width: `${(bid.total / maxTotal) * 100}%` }} />
+                    <div className="text-right text-accent-buy font-mono relative z-10">${bid.price.toFixed(2)}</div>
+                    <div className="text-right text-text-secondary font-mono relative z-10">{bid.amount.toFixed(4)}</div>
+                    <div className="text-right text-text-muted font-mono relative z-10">{bid.total.toFixed(4)}</div>
                   </div>
                 );
               })
             ) : (
-              <div className="text-center text-jupiter-text-tertiary text-xs py-4">No buy orders</div>
+              <div className="text-center text-text-muted text-xs py-4">No buy orders</div>
             )}
-            <div className="grid grid-cols-3 gap-2 text-xs text-jupiter-text-tertiary mt-2 pt-2 border-t border-jupiter-border">
+            <div className="grid grid-cols-3 gap-2 text-xs text-text-muted mt-2 pt-2 border-t border-border">
               <div className="text-right">Price</div>
               <div className="text-right">Amount</div>
               <div className="text-right">Total</div>

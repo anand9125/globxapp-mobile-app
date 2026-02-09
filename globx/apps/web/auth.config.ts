@@ -25,7 +25,7 @@ export const authConfig: NextAuthConfig = {
   ],
 
   callbacks: {
-    async jwt({ token, user, account }: { token: any; user: any; account: any }) {
+    async jwt({ token, user, account }: { token: any; user: any; account?: any }) {
       if (user) {
         token.sub = user.id;
         token.email = user.email ?? undefined;

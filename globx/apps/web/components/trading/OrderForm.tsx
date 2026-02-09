@@ -111,27 +111,29 @@ export function OrderForm({ stock, currentPrice }: OrderFormProps) {
     },
   });
 
-  // Calculate estimated values
-  const estimatedShares = quote && side === "buy"
-    ? quote.outAmount / Math.pow(10, stock.decimals)
+  type QuoteData = { inAmount: number; outAmount: number; priceImpactPct?: string };
+  const q = quote as QuoteData | undefined;
+
+  const estimatedShares = q && side === "buy"
+    ? q.outAmount / Math.pow(10, stock.decimals)
     : amountType === "shares"
     ? parseFloat(amount) || 0
     : (parseFloat(amount) || 0) / currentPrice;
 
-  const estimatedTotal = quote && side === "buy"
-    ? quote.inAmount / Math.pow(10, USDC.decimals)
+  const estimatedTotal = q && side === "buy"
+    ? q.inAmount / Math.pow(10, USDC.decimals)
     : amountType === "shares"
     ? (parseFloat(amount) || 0) * currentPrice
     : parseFloat(amount) || 0;
 
-  const estimatedReceived = quote && side === "sell"
-    ? quote.outAmount / Math.pow(10, USDC.decimals)
+  const estimatedReceived = q && side === "sell"
+    ? q.outAmount / Math.pow(10, USDC.decimals)
     : amountType === "shares"
     ? (parseFloat(amount) || 0) * currentPrice
     : parseFloat(amount) || 0;
 
   const fee = estimatedTotal * 0.005; // 0.5% fee
-  const priceImpact = quote?.priceImpactPct ? parseFloat(quote.priceImpactPct) : 0;
+  const priceImpact = q?.priceImpactPct ? parseFloat(q.priceImpactPct) : 0;
 
   const handlePercentageClick = (percent: number) => {
     const maxAmount = balanceAmount;
@@ -255,7 +257,7 @@ export function OrderForm({ stock, currentPrice }: OrderFormProps) {
             </div>
           )}
 
-          {quote && !quoteLoading && (
+          {!!q && !quoteLoading && (
             <div className="space-y-2 p-4 bg-bg-tertiary rounded-xl">
               <div className="flex justify-between text-sm">
                 <span className="text-text-secondary">Estimated Shares</span>
@@ -402,7 +404,7 @@ export function OrderForm({ stock, currentPrice }: OrderFormProps) {
             </div>
           )}
 
-          {quote && !quoteLoading && (
+          {!!q && !quoteLoading && (
             <div className="space-y-2 p-4 bg-bg-tertiary rounded-xl">
               <div className="flex justify-between text-sm">
                 <span className="text-text-secondary">You'll Receive</span>
