@@ -111,5 +111,82 @@ export function createPortfolioRouter(prisma: PrismaClient): Router {
     }
   });
 
+  //GET /v1/users/:id/trades
+  //Get user's trades
+
+  router.get("/users/:id/trades", async (req: Request, res: Response) => {
+    try {
+      const userId = req.params.id as string;
+      const user = (req as any).user;
+
+      if (!userId || user?.id !== userId) {
+        return res.status(403).json({
+          error: "FORBIDDEN",
+          message: "Cannot access other user's trades",
+        });
+      }
+
+      const limit = parseInt(req.query.limit as string) || 50;
+      const offset = parseInt(req.query.offset as string) || 0;
+      const tokenMint = req.query.tokenMint as string | undefined;
+
+      const where: any = { userId };
+      if (tokenMint) {
+        where.OR = [
+          { inputTokenMint: tokenMint },
+          { outputTokenMint: tokenMint },
+        ];
+      }
+
+      const [trades, total] = await Promise.all([
+        prisma.trade.findMany({
+          where,
+          orderBy: { createdAt: "desc" },
+          take: limit,
+          skip: offset,
+          select: {
+            id: true,
+            direction: true,
+            inputTokenMint: true,
+            inputAmount: true,
+            outputTokenMint: true,
+            outputAmount: true,
+            priceUsd: true,
+            status: true,
+            createdAt: true,
+            executedAt: true,
+          },
+        }),
+        prisma.trade.count({ where }),
+      ]);
+
+      res.json({
+        trades: trades.map((t) => ({
+          id: t.id,
+          direction: t.direction,
+          inputTokenMint: t.inputTokenMint,
+          inputAmount: t.inputAmount.toString(),
+          outputTokenMint: t.outputTokenMint,
+          outputAmount: t.outputAmount.toString(),
+          priceUsd: t.priceUsd?.toString() || null,
+          status: t.status,
+          createdAt: t.createdAt.toISOString(),
+          executedAt: t.executedAt?.toISOString() || null,
+        })),
+        pagination: {
+          limit,
+          offset,
+          total,
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching user trades:", error);
+      res.status(500).json({
+        error: "INTERNAL_ERROR",
+        message: "Failed to fetch user trades",
+      });
+    }
+  });
+
   return router;
 }

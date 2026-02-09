@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "bullmq": "^5.22.2",
+    "cors": "^2.8.5",
     "express": "^5.2.1",
     "jose": "^5.9.6",
     "zod": "^3.23.8",
@@ -17,10 +18,13 @@
     "@repo/solana": "workspace:*",
     "@repo/ledger": "workspace:*",
     "pino": "^9.5.0",
-    "pino-http": "^10.2.0"
+    "pino-http": "^10.2.0",
+    "ws": "^8.14.2"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.17",
     "@types/express": "^5.0.0",
+    "@types/ws": "^8.5.10",
     "typescript": "5.9.2"
   }
 }

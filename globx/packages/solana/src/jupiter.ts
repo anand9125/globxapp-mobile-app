@@ -6,10 +6,11 @@ import { PublicKey } from "@solana/web3.js";
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
 const isDevnet = SOLANA_RPC_URL.includes("devnet");
 
-// Replace the hardcoded line
+// Jupiter Metis Swap API base URLs
+// Documentation: https://dev.jup.ag/docs/swap-api/get-quote
 const JUPITER_API_BASE = isDevnet 
-  ? process.env.JUPITER_API_BASE_DEVNET || "https://quote-api.jup.ag/v6/"  // Verify devnet endpoint
-  : process.env.JUPITER_API_BASE || "https://api.jup.ag/";
+  ? process.env.JUPITER_API_BASE_DEVNET || "https://api.jup.ag"  // Devnet endpoint (same as mainnet)
+  : process.env.JUPITER_API_BASE || "https://api.jup.ag";  // Mainnet endpoint
 
 export interface JupiterQuoteParams {
   inputMint: string;
@@ -85,29 +86,52 @@ export async function fetchJupiterQuote(
   params: JupiterQuoteParams,
   options?: JupiterFetchQuoteOptions,
 ): Promise<JupiterQuoteResponse> {
+  // Jupiter Metis Swap API endpoint: https://api.jup.ag/swap/v1/quote
   const url = new URL(`${JUPITER_API_BASE}/swap/v1/quote`);
   url.searchParams.set("inputMint", params.inputMint);
   url.searchParams.set("outputMint", params.outputMint);
   url.searchParams.set("amount", params.amount.toString());
   url.searchParams.set("slippageBps", params.slippageBps.toString());
-  url.searchParams.set(
-    "restrictIntermediateTokens",
-    params.restrictIntermediateTokens ? "true" : "false",
-  );
-  url.searchParams.set("maxAccounts", params.maxAccounts?.toString() || "64");
+  if (params.restrictIntermediateTokens !== undefined) {
+    url.searchParams.set(
+      "restrictIntermediateTokens",
+      params.restrictIntermediateTokens ? "true" : "false",
+    );
+  }
+  if (params.maxAccounts) {
+    url.searchParams.set("maxAccounts", params.maxAccounts.toString());
+  }
+  
   const headers: Record<string, string> = {
     "Content-Type": "application/json",
   };
   if (options?.apiKey) {
     headers["x-api-key"] = options.apiKey;
   }
+  
+  // Debug logging (can be removed in production)
+  if (process.env.NODE_ENV !== "production") {
+    console.log("Jupiter API Request:", {
+      url: url.toString(),
+      hasApiKey: !!options?.apiKey,
+      method: "GET",
+    });
+  }
+  
   const response = await fetch(url.toString(), {
     headers,
   });
+  
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Failed to fetch Jupiter quote: ${text}`);
+    console.error("Jupiter API Error:", {
+      status: response.status,
+      statusText: response.statusText,
+      body: text,
+    });
+    throw new Error(`Failed to fetch Jupiter quote (${response.status}): ${text}`);
   }
+  
   return (await response.json()) as JupiterQuoteResponse;
 }
 
@@ -125,11 +149,14 @@ export async function getJupiterSwapInstructions(
     params: JupiterGetSwapInstructionsParams,
     options?: JupiterFetchQuoteOptions,
 ): Promise<JupiterSwapInstructionsResponse> {
-    const url = new URL(`${JUPITER_API_BASE}/swap/v1/swap-instructions`);
-    url.searchParams.set("quoteResponse", JSON.stringify(params.quoteResponse));
+    // Jupiter Metis Swap API endpoint: https://api.jup.ag/swap/v1/swap
+    const url = new URL(`${JUPITER_API_BASE}/swap/v1/swap`);
     const body = {
         quoteResponse: params.quoteResponse,
         userPublicKey: params.userPublicKey,
+        wrapAndUnwrapSol: true,
+        dynamicComputeUnitLimit: true,
+        prioritizationFeeLamports: "auto",
       };
     
       const headers: Record<string, string> = {
@@ -139,7 +166,7 @@ export async function getJupiterSwapInstructions(
         headers["x-api-key"] = options.apiKey;
       }
     
-      const res = await fetch(url, {
+      const res = await fetch(url.toString(), {
         method: "POST",
         headers,
         body: JSON.stringify(body),
