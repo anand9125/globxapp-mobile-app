@@ -1,21 +1,13 @@
-import React, { useEffect } from "react";
+import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import type { RootStackScreenProps } from "../navigation/types";
-import { useAuth } from "../contexts/AuthContext";
 import { colors, spacing } from "../lib/theme";
 
 type Props = RootStackScreenProps<"Home">;
 
 export function HomeScreen() {
   const navigation = useNavigation<Props["navigation"]>();
-  const { isAuthenticated, isLoading } = useAuth();
-
-  useEffect(() => {
-    if (!isLoading && isAuthenticated) {
-      navigation.replace("Main");
-    }
-  }, [isLoading, isAuthenticated, navigation]);
 
   return (
     <View style={styles.container}>
@@ -27,15 +19,9 @@ export function HomeScreen() {
         </Text>
         <TouchableOpacity
           style={styles.primaryButton}
-          onPress={() => navigation.navigate("SignIn")}
+          onPress={() => navigation.replace("Main")}
         >
-          <Text style={styles.primaryButtonText}>Sign In</Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.secondaryButton}
-          onPress={() => navigation.navigate("SignUp")}
-        >
-          <Text style={styles.secondaryButtonText}>Create Account</Text>
+          <Text style={styles.primaryButtonText}>Get Started</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -76,12 +62,4 @@ const styles = StyleSheet.create({
     marginBottom: spacing[3],
   },
   primaryButtonText: { color: "#fff", fontSize: 16, fontWeight: "600" },
-  secondaryButton: {
-    borderWidth: 1,
-    borderColor: colors.border,
-    paddingVertical: spacing[4],
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  secondaryButtonText: { color: colors.text.primary, fontSize: 16, fontWeight: "600" },
 });

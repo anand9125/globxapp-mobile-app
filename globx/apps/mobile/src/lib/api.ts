@@ -242,6 +242,29 @@ export async function requestWithdrawal(
   );
 }
 
+// --- Price (1 unit quote for current price) ---
+export async function getTokenPrice(
+  token: string,
+  params: { inputTokenMint: string; outputTokenMint: string }
+) {
+  const inputDecimals = params.inputTokenMint === "So11111111111111111111111111111111111111112" ? 9 : 6;
+  const amount = Math.pow(10, inputDecimals).toString();
+  const quote = await getTradeQuote(token, {
+    ...params,
+    amount,
+    slippageBps: 50,
+  });
+  const outputDecimals = params.outputTokenMint === "So11111111111111111111111111111111111111112" ? 9 : 6;
+  const inputAmount = parseFloat(amount) / Math.pow(10, inputDecimals);
+  const outputAmount = quote.outAmount / Math.pow(10, outputDecimals);
+  return {
+    price: outputAmount / inputAmount,
+    inputMint: params.inputTokenMint,
+    outputMint: params.outputTokenMint,
+    timestamp: Date.now(),
+  };
+}
+
 // --- Ledger ---
 export async function getLedger(
   userId: string,

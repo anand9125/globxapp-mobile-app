@@ -3,8 +3,6 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import type { RootStackParamList } from "./types";
 import { MainTabs } from "./MainTabs";
 import { HomeScreen } from "../screens/HomeScreen";
-import { SignInScreen } from "../screens/SignInScreen";
-import { SignUpScreen } from "../screens/SignUpScreen";
 import { DepositScreen } from "../screens/DepositScreen";
 import { WithdrawScreen } from "../screens/WithdrawScreen";
 import { HistoryScreen } from "../screens/HistoryScreen";
@@ -27,16 +25,6 @@ export function RootNavigator() {
       <Stack.Screen
         name="Home"
         component={HomeScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="SignIn"
-        component={SignInScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="SignUp"
-        component={SignUpScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

@@ -136,9 +136,10 @@ async function start() {
   try {
     await indexer.start();
 
-    httpServer.listen(PORT, () => {
-      console.log(`API server listening on port ${PORT}`);
-      console.log(`WebSocket server available at ws://localhost:${PORT}/ws`);
+    httpServer.listen(PORT, "0.0.0.0", () => {
+      console.log(`API server listening on port ${PORT} (all interfaces)`);
+      console.log(`  HTTP: http://localhost:${PORT} (and your LAN IP for mobile)`);
+      console.log(`  WebSocket: ws://localhost:${PORT}/ws`);
     });
 
     process.on("SIGTERM", async () => {
