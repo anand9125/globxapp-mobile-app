@@ -29,7 +29,7 @@ const supportedTokens = [
   "Xsc9qvGR1efVDFGLrVsmkzv3qi45LTBjeUKSPmx9qEh", // xxNVDA
 ];
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 3030;
 const SOLANA_RPC_URL = process.env.SOLANA_RPC_URL || "https://api.mainnet-beta.solana.com";
 const REDIS_URL = process.env.REDIS_URL || "redis://localhost:6379";
 

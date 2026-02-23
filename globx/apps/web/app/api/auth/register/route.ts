@@ -46,6 +46,24 @@ export async function POST(request: Request) {
     );
   } catch (error) {
     console.error("Registration error:", error);
+
+    // Surface database connection issues
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      message.includes("DATABASE_URL") ||
+      message.includes("connect") ||
+      message.includes("ECONNREFUSED") ||
+      message.includes("connection")
+    ) {
+      return NextResponse.json(
+        {
+          message: "Database connection failed. Check DATABASE_URL and that PostgreSQL is running.",
+          hint: "Verify with GET /api/health/db",
+        },
+        { status: 503 }
+      );
+    }
+
     return NextResponse.json(
       { message: "Internal server error" },
       { status: 500 }
