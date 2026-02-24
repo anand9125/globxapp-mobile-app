@@ -1,10 +1,5 @@
 import type { NativeStackScreenProps } from "@react-navigation/native-stack";
 
-export type AuthStackParamList = {
-  SignIn: undefined;
-  SignUp: undefined;
-};
-
 export type MainTabParamList = {
   Dashboard: undefined;
   Trade: undefined;
@@ -19,14 +14,8 @@ export type RootStackParamList = {
   Withdraw: undefined;
   History: undefined;
   Settings: undefined;
-} & {
-  [K in keyof AuthStackParamList]: AuthStackParamList[K];
 };
 
-export type AuthStackScreenProps<T extends keyof AuthStackParamList> = NativeStackScreenProps<
-  AuthStackParamList,
-  T
->;
 export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeStackScreenProps<
   RootStackParamList,
   T
@@ -35,6 +24,5 @@ export type RootStackScreenProps<T extends keyof RootStackParamList> = NativeSta
 declare global {
   namespace ReactNavigation {
     interface RootParamList extends RootStackParamList {}
-    interface AuthParamList extends AuthStackParamList {}
   }
 }

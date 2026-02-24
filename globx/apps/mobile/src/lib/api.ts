@@ -16,15 +16,35 @@ export interface ApiError {
   details?: unknown;
 }
 
+/** Message thrown when device cannot reach server (e.g. localhost on Expo Go) */
+export const NETWORK_ERROR_MESSAGE =
+  "Network request failed. On Expo Go with a physical device, use your computer's LAN IP in apps/mobile/.env (EXPO_PUBLIC_AUTH_URL and EXPO_PUBLIC_API_URL), then restart Expo.";
+
+function isNetworkFailure(e: unknown): boolean {
+  if (e instanceof TypeError)
+    return (
+      e.message === "Network request failed" ||
+      e.message === "Failed to fetch" ||
+      e.message?.includes("Network request failed")
+    );
+  return false;
+}
+
 async function fetchApi<T>(baseUrl: string, endpoint: string, options?: RequestInit): Promise<T> {
   const url = `${baseUrl}${endpoint}`;
-  const response = await fetch(url, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...options,
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+    });
+  } catch (e) {
+    if (isNetworkFailure(e)) throw new Error(NETWORK_ERROR_MESSAGE);
+    throw e;
+  }
 
   if (!response.ok) {
     const error: ApiError = await response.json().catch(() => ({
@@ -220,6 +240,29 @@ export async function requestWithdrawal(
     token,
     { method: "POST", body: JSON.stringify(data) }
   );
+}
+
+// --- Price (1 unit quote for current price) ---
+export async function getTokenPrice(
+  token: string,
+  params: { inputTokenMint: string; outputTokenMint: string }
+) {
+  const inputDecimals = params.inputTokenMint === "So11111111111111111111111111111111111111112" ? 9 : 6;
+  const amount = Math.pow(10, inputDecimals).toString();
+  const quote = await getTradeQuote(token, {
+    ...params,
+    amount,
+    slippageBps: 50,
+  });
+  const outputDecimals = params.outputTokenMint === "So11111111111111111111111111111111111111112" ? 9 : 6;
+  const inputAmount = parseFloat(amount) / Math.pow(10, inputDecimals);
+  const outputAmount = quote.outAmount / Math.pow(10, outputDecimals);
+  return {
+    price: outputAmount / inputAmount,
+    inputMint: params.inputTokenMint,
+    outputMint: params.outputTokenMint,
+    timestamp: Date.now(),
+  };
 }
 
 // --- Ledger ---
